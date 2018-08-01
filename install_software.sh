@@ -20,5 +20,3 @@ sudo pip3 install fortranformat
 
 # GSL library
 # gsl-bin  libgsl0-dbg  libgsl0-dev libgsl0ldbl
-
-
