@@ -1,0 +1,86 @@
+# Please do NOT change any name of the variables, including the symbol "." afterwards
+# Each variable name should take up 10 spaces
+#
+flag_rad..    2       ! Energy loss mechanism: 0-collisional; 1-radiative; 2-both.
+iflav.....    4       ! Flavor of parton to select: 4-charm; 5-beauty.
+qhat_TP...    5       ! 0: constant qhat/T^3
+                      ! 1: use table of qhat/T^3 as functions of T,p
+                      ! 2: use linear parametrization of T only
+                      ! 3: use linear parameterization with momentum dependence
+                      ! 4: use only momentum dependence
+                      ! 5: use combination from pQCD and linear temperature
+# 5 parameters of T, p dependent K factors
+KPamp.....    3.0     ! amplitude of P Kactor
+KPsig.....    7.0     ! width of P Kactor
+KTamp.....    10.0    ! amplitude of T Kactor, effectively on alphas
+KTsig.....    0.05    ! width of T Kactor, in the unit of Tc
+preKT.....    0.7     ! overall rescale of T Kactor
+#
+qhatMin...    0.2     ! valid only qhat_TP=2,3 or 4 or 5
+qhatSlope.    2.0     ! valid only qhat_TP=2,3 or 4 or 5
+qhatPower.    0.0     ! valid only qhat_TP=3 or 4 or 5
+preP......    1.0
+qhatC.....    0.0
+#
+D2piT.....    5.0     ! Heavy quark spatial diffusion coefficient: D(2piT)
+                      ! valid only when qhat_TP=0
+KFactor...    1.0     ! KFactor for qhat when qhat_TP=1
+TLow......    0.165   ! for qhat_TP=2 parametrization
+THigh.....    0.4
+qhatLow...    5.5
+qhatHigh..    5.5
+#
+# Initialization of heavy quarks 
+HQ_input..    3       ! Source of the input file of initial heavy quarks:
+                      ! 1 - read in oscar file;
+                      ! 2 - read in OSU file (initial positions only).
+                      ! 3 - read in a list of x-y positions only.
+NUMSAMP...    1       ! number of repeated samples
+                      ! only ready for static=2, HQ_input=3
+reweight..    2       ! Re-weight initial momentum distribution:
+                      ! (must be 1 or 2 if HQ_input is 2 or 3)
+                      ! 0 - no re-weighting
+                      ! 1 - re-sample pT distribution according to wt table
+                      ! 2 - use uniform distribution (may re-weight them later for analysis)
+# If reweight is not 0, then the following is required
+eta_cut...    0.5     ! rapidity cut, symmetric inteval
+pT_min....    0       ! minimum value of initial pT
+pT_max....    140      ! maximum value of initial pT
+# If reweight=1, set the dimensions of the pT weight table here
+wt_num....    140     ! Number of points in the table
+                      ! Maximum number is 300 by default. If exceeded, change wt_MAXnum in df_coms.f
+wt_int....    0.5     ! Bin size of the weight table
+wt_Tab_min    0.5     ! Minium pT value inside the table
+#
+# Running modes
+out_skip..    1       ! Control how many time steps for each output
+                      ! 0 - no evolution, output init. condition
+                      ! 1 - only output the last time step
+                      ! Other positive integers
+exp_setup.    1       ! 1 - LHC 2.76~TeV; 2 - RHIC 200~GeV (doesn't work for HQ_input=1)
+ebe_flag..    2       ! Event-by-event study: (must choose 2 when HQ_input is not 2)
+                      ! 0 - smooth initial condition; 
+                      ! 1 - e-by-e study
+                      ! 2 - no rotation
+corr_flag.    0       ! 1 for calculation of HF pair correlation
+#
+# Other options for the code
+static....    2       ! Choose the type of medium
+                      ! 0 - Chiho's hydro, 1 - Static, 2 - OSU hydro
+stat_cool.    0       ! If static=1, stat_cool=1 provides cooling of Bjorken's expansion
+T_static..    0.30    ! If static=1, set medium temperature in GeV here
+tsteps_cut    200     ! Control total timesteps for Langevin evolution 
+                      ! (One timestep for 0.1~fm/c)
+                      ! Necessary for static=1 and helpful for static=2
+temp_cut..    1       ! 0 for no cut, 1 for cut (necessary for dynamic medium)
+Tcut......    0.154   ! Below which the Langevin evolution stops (valid with temp_cut=1)
+#
+# Cross section at y=0 (dsigma/dy|y=0 unit mb)
+sigma_c0..    0.68432  ! LHC AA->c
+sigma_b0..    0.056263 ! LHC AA->b
+num_binary    0     ! number of binary collisions, negative for no constraint
+                       ! only works for HQ_input=3
+# End of list: do NOT remove the symbol "xx"
+xx
+
+

@@ -1,0 +1,31 @@
+# Please do NOT change any name of the variables, including the symbol "." afterwards
+# Each variable name should take up 10 spaces
+#
+hadr_flag.    3       ! 1 - pure fragmentation
+                      ! 2 - pure recombination to D0 and D+
+                      ! 3 - frag. + recomb. (including Ds not yet)
+HQid......    4       ! Heavy quark flavor: 4-charm; 5-beauty.
+HMDecay...    0       ! 0 - HQ won't decay; 1 - Decay (Set to 0 at this moment)
+#
+# Parameters of the recomb. probability table 
+prob_num..    41       ! Total number of points (Check maximum value allowed)
+                      ! (prob_num_MAX = 50 by defalt in common.f)
+prob_int_c    0.5     ! Bin size for c quark
+prob_int_b    0.5     ! Bin size for b quark
+#
+# Other parameters (Should be consistent with calculation of normalization)
+omega_c...    0.215   ! Angular frequency of the S.H.O. of c-hadron
+omega_b...    0.102   ! Angular frequency of the S.H.O. of b-hadron
+omega_cM..    0.33d0  ! Angular frequency for c-Meson 
+omega_cB..    0.43d0  ! Angular frequency for c-Baryon 
+omega_bM..    0.33d0  ! Angular frequency for b-Meson
+omega_bB..    0.41d0  ! Angular frequency for b-Baryon 
+
+m_ud......    0.300   ! Thermal mass of ud quark
+m_s.......    0.475   ! Thermal mass of s quark
+m_g.......    0.600   ! Thermal mass of s quark
+#
+# End of list: do NOT remove the symbol "xx"
+xx
+
+

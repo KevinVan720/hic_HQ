@@ -1,11 +1,17 @@
 #!/bin/bash
 
-git clone --recursive https://github.com/Yingru/hic_HQ-osg.git
-
 sudo apt-get install cmake libboost-all-dev  libhdf5-serial-dev
 sudo apt-get install python3 python3-h5py python3-numpy python3-scipy python3-pip
 sudo apt-get install gsl-bin libgsl0-dbg libgsl0-dev libgsl0ldbl
 sudo pip3 install fortranformat
+
+git clone --recursive https://github.com/Yingru/hic_HQ-osg.git
+cd hic_HQ-osg
+git checkout container
+git submodule update
+./makepkg
+
+
 
 # cmake --version
 # 2.8.12.2
