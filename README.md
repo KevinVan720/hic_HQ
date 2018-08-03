@@ -7,8 +7,30 @@
   * [1.2 to build a `Docker` container from *Dockerfile*](#12-to-build-a--docker--container-from--dockerfile-)
 
 
-## 1. Work locally (make sure you have root right)
+## 0. Work locally (make sure you have root right)
+```
+git clone https://github.com/Yingru/hic_HQ.git
 
+cd hic_HQ/
+bash install_software.sh  # returns a tar.gz file where contains all the modules
+
+
+mkdir test
+cp hic_HQ-osg/hic_HQ-osg.tar.gz test/
+cd test/
+tar -xzf hic_HQ-osg.tar.gz
+cp -r ../workdir/ hic_HQ-osg
+cd hic_HQ-osg/workdir
+
+
+python3 python3 run-events_cD.py args.conf 0
+# args.conf set up parameters ($\alpha_s, \hat{q}_{min}, \hat{q}_{slope}, \gamma$)
+# parameter_df.dat are diffusion parameters (particle_ID, hydro_ID, HQ list ...)
+# parameter_hd.dat are hadronization parameters (particle_ID ...)
+# HQ_sample.conf are initially sample HQ list parameters
+# vishnew.conf are hydro parameters (shear, bulk, edensity ...)
+# 0 is jobID, useful when you run parallel jobs
+```
 
 ## 1. Work with cloud computing system 
 
