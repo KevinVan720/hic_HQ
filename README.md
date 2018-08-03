@@ -1,15 +1,18 @@
 # hic_HQ
  A framework of heavy quark evolution in heavy-ion collisions
 
+- [0. Work locally (make sure you have root right)](#0-work-locally--make-sure-you-have-root-right-)
+- [1. Work with cloud computing system](#1-work-with-cloud-computing-system)
+  * [1.1 Install `Docker` in Chemeleon instance](#11-install--docker--in-chemeleon-instance)
+  * [1.2 to build a `Docker` container from *Dockerfile*](#12-to-build-a--docker--container-from--dockerfile-)
 
 
-- [1. Work with cloud computing system [**Chameleon**](https://www.chameleoncloud.org/)](#1-work-with-cloud-computing-system----chameleon----https---wwwchameleoncloudorg--)
-    * [1.1 Install `Docker` in Chemeleon instance](#11-install--docker--in-chemeleon-instance)
-    * [1.2 to build a `Docker` container from *Dockerfile*](#12-to-build-a--docker--container-from--dockerfile-)
+## 1. Work locally (make sure you have root right)
 
 
+## 1. Work with cloud computing system 
 
-## 1. Work with cloud computing system [**Chameleon**](https://www.chameleoncloud.org/)
+[**Chameleon**](https://www.chameleoncloud.org/)
 - [tutorial, get started]((https://chameleoncloud.readthedocs.io/en/latest/getting-started/index.html)
 - Create an account, join/create a project 
 - Loggin in through [UChicago](https://chi.uc.chameleoncloud.org/) or [TACC](https://chi.tacc.chameleoncloud.org/)
