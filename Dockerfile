@@ -21,10 +21,10 @@ RUN git checkout container
 RUN git submodule update
 
 RUN bash makepkg
-RUN cp hic_HQ-osg.tar.gz /tmp
+RUN cp hic_HQ-osg.tar.gz /var
 
 # run the events
-WORKDIR /tmp
+WORKDIR /var
 RUN tar -xzf hic_HQ-osg.tar.gz
 
-WORKDIR /tmp/hic_HQ-osg/results
+WORKDIR /var/hic_HQ-osg/results
