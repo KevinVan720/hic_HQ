@@ -4,7 +4,8 @@
 - [0. Work locally (make sure you have root right)](#0-work-locally--make-sure-you-have-root-right-)
 - [1. Work with cloud computing system](#1-work-with-cloud-computing-system)
   * [1.1 Install `Docker` in Chemeleon instance](#11-install--docker--in-chemeleon-instance)
-  * [1.2 to build a `Docker` container from *Dockerfile*](#12-to-build-a--docker--container-from--dockerfile-)
+  * [1.2a Build a `Docker` container from *Dockerfile*](#12a-build-a--docker--container-from--dockerfile-)
+  * [1.2b Instead of 1.2a, pull a `Docker` image from *dockerhub*](#12b-instead-of-12a-pull-a--docker--image-from--dockerhub-)
 
 
 ## 0. Work locally (make sure you have root right)
@@ -49,7 +50,7 @@ ssh cc@ip_address
 
 ### 1.1 Install `Docker` in Chemeleon instance
 ```
-ssh cc@192.5.87.168
+ssh cc@192.5.87.178
 
 # check OS version
 lsb_release -a
@@ -57,24 +58,38 @@ lsb_release -a
 # install docker and its dependencies
 # 1. you can use the default installation, such as apt-get to install from OS repository
 # 2. install from source (17.03.2 version)
+
+mkdir Install && cd Install
 sudo apt-get install libsystemd-journal0
 wget https://download.docker.com/linux/ubuntu/dists/trusty/pool/stable/amd64/docker-ce_17.03.2~ce-0~ubuntu-trusty_amd64.deb
 sudo dpkg -i docker-ce_17.03.2~ce-0~ubuntu-trusty_amd64.deb
 ```
 
 
-### 1.2 to build a `Docker` container from *Dockerfile*
+### 1.2a Build a `Docker` container from *Dockerfile*
 ```
 # build the docker image
 git clone https://github.com/Yingru/hic_HQ.git
 cd hic_HQ/
 sudo docker build -t hic_hq:v1 .
+
+# check docker images
+sudo docker images
 cd workdir/
 
 # to run the executable
 # run-events_cD.py is the pipeline script
 # args.conf changes the parameters ($alpha_s, \hat{q}_{min}, \hat{q}_{slope}, \gamma$
 # 0 is the jobID (useful to run parallel events)
-sudo docker run -v `pwd`:/var/hic_HQ-osg/results hic_hq:v2 python3 run-events_cD.py args.conf 0
+sudo docker run -v `pwd`:/var/hic_HQ-osg/results hic_hq:v1 python3 run-events_cD.py args.conf 0
 ```
 
+### 1.2b Instead of 1.2a, pull a `Docker` image from *dockerhub*
+```
+# distinguish from previous case, dockerhub autimatically assign tag as latest
+sudo docker pull yingruxu/hic_hq:latest
+sudo docker images
+cd workdir/
+sudo docker run -v `pwd`:/var/hic_HQ-osg/results yingruxu/hic_hq:latest python3 run-events_cD.py args.conf 1
+
+```
