@@ -48,7 +48,7 @@ ssh-add yx59chameleonkey.pem
 ssh cc@ip_address
 ```
 
-### 1.1 Install `Docker` in Chemeleon instance
+### 1.1 Install `Docker` in Chameleon instance
 ```
 ssh cc@192.5.87.178
 
@@ -91,5 +91,66 @@ sudo docker pull yingruxu/hic_hq:latest
 sudo docker images
 cd workdir/
 sudo docker run -v `pwd`:/var/hic_HQ-osg/results yingruxu/hic_hq:latest python3 run-events_cD.py args.conf 1
+
+```
+
+
+### 1.3 Install `singularity` in Chameleon instance
+```
+#singularity dependencies
+sudo apt-get update
+sudo apt-get install libarchive-dev python dh-autoreconf build-essential
+
+# install the maste branch
+git clone https://github.com/singularityware/singularity.git
+cd singularity
+
+# ERRRR, their master branch is not consistent with tutorial!
+git checkout vault/release-2.5
+
+./autogen.sh
+./configure --prefix=/usr/local
+make
+sudo make install
+```
+
+
+### 1.3a Pull `singularity` container from `dockerhub` <font color='red'> currently broken! need to fix </font>
+```
+# check version, better use 2.5.2 (for some reason, the older version 2.3 doesn't pull)
+singularity --version
+
+cd workdir/
+sudo apt-get update && sudo apt-get install squashfs-tools 
+singularity pull docker://yingruxu/hic_hq
+
+# convert this to a writable container
+singularity build --writable hic_hq_write.img hic_hq.simg
+
+# or build from dockerhub (not sure what is the difference)
+singularity build --writable hic_hq_write.img docker://yingruxu/hic_hq
+
+
+# doesn't work? read-only filesystem? I am not able to write? -- fixed
+# now the second question, not enough space
+sudo singularity shell --writable -B $PWD:/var/hic_HQ-osg/results hic_hq_write.img
+cd /var/hic_HQ-osg/results/
+# for some reason need to set locale?
+echo "LC_ALL=en_US.UTF-8" >> /etc/environment
+echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
+echo "LANG=en_US.UTF-8" > /etc/locale.conf
+locale-gen en_US.UTF-8
+
+python3 run-events_cD.py args.conf 0
+```
+
+
+### 1.3b Or instead 1.3a, build `singularity` image from recipe
+```
+# remember to build writable image
+sudo singularity build --writable hic_hq.img Singularity
+
+# to test singularity container interactively
+sudo singularity shell --writable -B $PWD:/var/hic_HQ-osg/results hic_hq.img
 
 ```
