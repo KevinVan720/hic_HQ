@@ -24,6 +24,12 @@ From: ubuntu:14.04
     git checkout container
     git submodule update 
     bash makepkg
-    
+
+
+    cp hic_HQ-osg.tar.gz /var
+    cd /var
+    tar -xzf hic_HQ-osg.tar.gz 
+    cd hic_HQ-osg/    
+
     echo "now everything is done!"
     ls -l
