@@ -14,7 +14,13 @@
 
 
 
-## 0. Work locally (make sure you have root right)
+## 0. Work locally (make sure you have root right, or have the all the dependencies)
+prerequisites:
+- python3, numpy, scipy, hdf5, pip
+- C/C++/Fortran compilers ==> tested: GNU gcc/g++/gfortran 4.8.4 version
+- cmake (2.8+), boost (1.54+), HDF5 (1.8.11)
+
+or you can install all the dependencies using `install_software.sh` (on a ubunut14.04 OS)
 ```
 git clone https://github.com/Yingru/hic_HQ.git
 
@@ -38,6 +44,8 @@ python3 python3 run-events_cD.py args.conf 0
 # vishnew.conf are hydro parameters (shear, bulk, edensity ...)
 # 0 is jobID, useful when you run parallel jobs
 ```
+
+
 
 ## 1. Work with cloud computing system 
 
@@ -159,6 +167,7 @@ sudo singularity build --writable hic_hq.img Singularity
 # to test singularity container interactively
 sudo singularity shell --writable -B $PWD:/var/hic_HQ-osg/results hic_hq.img
 
+<<<<<<< HEAD
 # to run trento events
 sudo singularity exec --writable -B $PWD:/var/hic_HQ-osg/results hic_hq.img  /var/hic_HQ-osg/bin/trento Pb Pb 10  --output initial.hdf5
 
@@ -170,3 +179,6 @@ sudo singularity exec --writable -B $PWD:/var/hic_HQ-osg/results hic_hq.img  pyt
 - Change the *Dockerfile* to add the `locale` information (it is fine with `Docker` container, but cause trouble when using `singularity pull/build` from *Dockerhub*
 - Right now I still need `root` privilege to be able to write in a singularity container filesystem (even though I already choose the `--writable` option, need to fix that
 - While running in a `singularity` container, the space limit is reached? (use `--sandbox` instead of `--writable`?)
+=======
+```
+>>>>>>> 6c170142da31ead53fd2857f8755f37b4a68a8be
