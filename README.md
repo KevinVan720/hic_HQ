@@ -1,11 +1,17 @@
 # hic_HQ
  A framework of heavy quark evolution in heavy-ion collisions
 
+
 - [0. Work locally (make sure you have root right)](#0-work-locally--make-sure-you-have-root-right-)
 - [1. Work with cloud computing system](#1-work-with-cloud-computing-system)
-  * [1.1 Install `Docker` in Chemeleon instance](#11-install--docker--in-chemeleon-instance)
+  * [1.1 Install `Docker` in Chameleon instance](#11-install--docker--in-chameleon-instance)
   * [1.2a Build a `Docker` container from *Dockerfile*](#12a-build-a--docker--container-from--dockerfile-)
-  * [1.2b Instead of 1.2a, pull a `Docker` image from *dockerhub*](#12b-instead-of-12a-pull-a--docker--image-from--dockerhub-)
+  * [1.2b Instead of 1.2a, pull a `Docker` image from *dockerhub*](#12b-instead-of-12a--pull-a--docker--image-from--dockerhub-)
+  * [1.3 Install `singularity` in Chameleon instance](#13-install--singularity--in-chameleon-instance)
+  * [1.3a Pull `singularity` container from `dockerhub`](#13a-pull--singularity--container-from--dockerhub-)
+  * [1.3b Or instead 1.3a, build `singularity` image from recipe](#13b-or-instead-13a--build--singularity--image-from-recipe)
+- [2 Remaining issue (to be done)](#2-remaining-issue--to-be-done-)
+
 
 
 ## 0. Work locally (make sure you have root right)
@@ -48,7 +54,7 @@ ssh-add yx59chameleonkey.pem
 ssh cc@ip_address
 ```
 
-### 1.1 Install `Docker` in Chemeleon instance
+### 1.1 Install `Docker` in Chameleon instance
 ```
 ssh cc@192.5.87.178
 
@@ -93,3 +99,74 @@ cd workdir/
 sudo docker run -v `pwd`:/var/hic_HQ-osg/results yingruxu/hic_hq:latest python3 run-events_cD.py args.conf 1
 
 ```
+
+
+### 1.3 Install `singularity` in Chameleon instance
+```
+#singularity dependencies
+sudo apt-get update
+sudo apt-get install libarchive-dev python dh-autoreconf build-essential
+
+# install the maste branch
+git clone https://github.com/singularityware/singularity.git
+cd singularity
+
+# ERRRR, their master branch is not consistent with tutorial!
+git checkout vault/release-2.5
+
+./autogen.sh
+./configure --prefix=/usr/local
+make
+sudo make install
+```
+
+
+### 1.3a Pull `singularity` container from `dockerhub`
+```
+# check version, better use 2.5.2 (for some reason, the older version 2.3 doesn't pull)
+singularity --version
+
+cd workdir/
+sudo apt-get update && sudo apt-get install squashfs-tools 
+singularity pull docker://yingruxu/hic_hq
+
+# convert this to a writable container
+singularity build --writable hic_hq_write.img hic_hq.simg
+
+# or build from dockerhub (not sure what is the difference)
+singularity build --writable hic_hq_write.img docker://yingruxu/hic_hq
+
+
+# doesn't work? read-only filesystem? I am not able to write? -- fixed
+# now the second question, not enough space
+sudo singularity shell --writable -B $PWD:/var/hic_HQ-osg/results hic_hq_write.img
+cd /var/hic_HQ-osg/results/
+# for some reason need to set locale?
+echo "LC_ALL=en_US.UTF-8" >> /etc/environment
+echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
+echo "LANG=en_US.UTF-8" > /etc/locale.conf
+locale-gen en_US.UTF-8
+
+python3 run-events_cD.py args.conf 0
+```
+
+
+### 1.3b Or instead 1.3a, build `singularity` image from recipe
+```
+# remember to build writable image
+sudo singularity build --writable hic_hq.img Singularity
+
+# to test singularity container interactively
+sudo singularity shell --writable -B $PWD:/var/hic_HQ-osg/results hic_hq.img
+
+# to run trento events
+sudo singularity exec --writable -B $PWD:/var/hic_HQ-osg/results hic_hq.img  /var/hic_HQ-osg/bin/trento Pb Pb 10  --output initial.hdf5
+
+# to run full events
+sudo singularity exec --writable -B $PWD:/var/hic_HQ-osg/results hic_hq.img  python3 /var/hic_HQ-osg/results/run-events_cD.py /var/hic_HQ-osg/results/args.conf 0
+```
+
+## 2 Remaining issue (to be done)
+- Change the *Dockerfile* to add the `locale` information (it is fine with `Docker` container, but cause trouble when using `singularity pull/build` from *Dockerhub*
+- Right now I still need `root` privilege to be able to write in a singularity container filesystem (even though I already choose the `--writable` option, need to fix that
+- While running in a `singularity` container, the space limit is reached? (use `--sandbox` instead of `--writable`?)
