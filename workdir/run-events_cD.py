@@ -1,4 +1,4 @@
-#!usr/bin/env python3
+#!/usr/bin/env python3
 """
 run full space-time HQ evolution in heavy-ion collisions (seperated in several stages):
     -- initial condition (trento + HQ_sample)
@@ -13,9 +13,15 @@ import itertools
 import sys, os
 import subprocess
 import numpy as np
+import math
 import h5py
 import shutil
 from scipy.interpolate import interp1d
+
+sys.path.insert(1, 'lib/python3.5/site-packages')
+import freestream
+import frzout
+
 
 def run_cmd(*args, **kwargs):
     print(*args, flush=True)
@@ -54,32 +60,97 @@ def read_oscar_file(fileName):
     return ID, px, py, pz, p0, ipT
 
 
-def run_initial(collision_sys, nevents):
-    if collision_sys == 'AuAu200':
-        run_cmd('./trento Au Au ', str(nevents),
-                '--cross-section 4.2',
-                '--grid-max 13.05 --grid-step 0.1',
-                '--normalization 60 --fluctuation 1.6 --nucleon-width 0.49',
-                '--output initial', cwd=None)
-    elif collision_sys == 'PbPb5020':
-         run_cmd('./trento Pb Pb ', str(nevents),
-                '--cross-section 7.0',
-                '--grid-max 13.05 --grid-step 0.1',
-                #'--b-min 6.0 --b-max 7.0',
-                '--normalization 160 --fluctuation 1.6 --nucleon-width 0.51',
-                '--output initial', cwd=None)
-    elif collision_sys == 'PbPb2760':
-         run_cmd('./../bin/trento Pb Pb ', str(nevents),
-                '--cross-section 6.4',
-                '--grid-max 13.05 --grid-step 0.1',
-                '--normalization 131 --fluctuation 1.6 --nucleon-width 0.51',
-                '--output initial', cwd=None)
-    else: 
-        print(collision_sys, ' currently not implemented!')
+def save_fs_history(ic, event_size, grid_step, tau_fs, xi, grid_max, steps=5, coarse=False):
+    f = h5py.File('FreeStream.h5', 'w')
+    dxy = grid_step*(coarse or 1)
+    ls = math.ceil(event_size/dxy)
+    n = 2*ls + 1
+    NX, NY = ic.shape
+    # roll ic by index 1 to match hydro
+    ix = np.roll(np.roll(ic, shift=-1, axis=0), shift=-1, axis=1)
+    tau0 = tau_fs * xi
+    taus = np.linspace(tau0, tau_fs, steps)
+    dtau = taus[1] - taus[0]
+    gp = f.create_group('Event')
+    gp.attrs.create('XL', [-ls])
+    gp.attrs.create('XH', [ls])
+    gp.attrs.create('YL', [-ls])
+    gp.attrs.create('YH', [ls])
+    gp.attrs.create('Tau0', [tau0])
+    gp.attrs.create('dTau', [dtau])
+    gp.attrs.create('DX', [dxy])
+    gp.attrs.create('DY', [dxy])
+    gp.attrs.create('NTau', [steps])
+    gp.attrs.create('OutputViscousFlag', [1])
+
+    for itau, tau in enumerate(taus):
+        print(tau)
+        frame = gp.create_group('Frame_{:04d}'.format(itau))
+        fs = freestream.FreeStreamer(ic, grid_max, tau)
+        for fmt, data, arglist in [
+            ('e', fs.energy_density, [()]),
+            ('V{}', fs.flow_velocity, [(1,), (2,)]),
+            ('Pi{}{}', fs.shear_tensor, [(0, 0), (0, 1), (0, 2), (1,1), (1,2), (2,2)])
+        ]:
+            for a in arglist:
+                X = data(*a).T  # to get the correct x-y with vishnew?? (need to check this)
+                if fmt == 'V{}':
+                    X = X/data(0).T
+                if coarse:
+                    X = X[::coarse, ::coarse]
+                diff = X.shape[0] - n
+                start = int(abs(diff)/2)
+
+                if diff > 0:
+                    # original grid is larger -> cut out middle square
+                    s = slice(start, start + n)
+                    X = X[s, s]
+                elif diff < 0:
+                    # original grid is smaller -> create new array and place original grid in middle
+                    Xn = np.zeros((n, n))
+                    s = slice(start, start + X.shape[0])
+                    Xn[s, s] = X
+                    X = Xn
+
+                if fmt == 'V{}':
+                    Comp = {1:'x', 2:'y'}
+                    frame.create_dataset(fmt.format(Comp[a[0]]), data=X)
+                if fmt == 'e':
+                    frame.create_dataset(fmt.format(*a), data=X)
+                    frame.create_dataset('P', data=X/3.)
+                    frame.create_dataset('BulkPi', data=X*0.)
+                    prefactor =  1.0/15.62687/5.068**3
+                    frame.create_dataset('Temp', data=(X*prefactor)**0.25)
+                    s = (X + frame['P'].value)/(frame['Temp'].value + 1e-14)
+                    frame.create_dataset('s', data=s)
+                if fmt == 'Pi{}{}':
+                    frame.create_dataset(fmt.format(*a), data=X)
+        pi33 = -(frame['Pi00'].value + frame['Pi11'].value + frame['Pi22'].value)
+        frame.create_dataset('Pi33', data=pi33)
+        pi3z = np.zeros_like(pi33)
+        frame.create_dataset('Pi03', data=pi3z)
+        frame.create_dataset('Pi13', data=pi3z)
+        frame.create_dataset('Pi23', data=pi3z)
+    f.close()
 
 
-def run_hydro():
-    run_cmd('./vishnew')
+
+def run_initial(collision_sys, nevents, grid_step, grid_max, config):
+    proj = collision_sys[:2]
+    targ = collision_sys[2:4]
+    run_cmd(
+        './trento {} {}'.format(proj, targ), str(nevents),
+        '--grid-step {} --grid-max {}'.format(grid_step, grid_max),
+        '--output initial.hdf5',
+        config.get('trento_args', '')
+    )
+
+def run_hydro(tau_fs, dtau, grid_step, Nhalf, config):
+    run_cmd(
+        './vishnew initialuread=1 iein=0',
+        't0={} dt={} dxy={} nls={}'.format(tau_fs, dtau, grid_step, Nhalf),
+
+    )
 
 
 def run_HQsample():
@@ -145,12 +216,10 @@ def run_fragPLUSrecomb():
     output = p2.communicate()[0]
 
 
-def participant_plane_angle():
-    initialFile = 'initial.dat'
-    pp_angleFile = 'pp_angle.dat'
-    ed = np.loadtxt(initialFile)
-    x_init = np.linspace(-13, 13, 261)
-    y_init = np.linspace(-13, 13, 261)
+def participant_plane_angle(ed, grid_max):
+    grid_size = ed.shape
+    x_init = np.linspace(-grid_max, grid_max, grid_size[0])
+    y_init = np.linspace(-grid_max, grid_max, grid_size[1])
     rx0, ry0 = np.meshgrid(x_init, y_init)
     x0 = np.sum(rx0 * ed) / np.sum(ed)
     y0 = np.sum(ry0 * ed) / np.sum(ed)
@@ -164,7 +233,7 @@ def participant_plane_angle():
     psi = 0.5 * np.arctan2(aver_sin2, aver_cos2)
 
     astring = 'psi = {}'.format(str(psi))
-    f = open(pp_angleFile, 'w')
+    f = open('pp_angle.dat', 'w')
     f.write(astring)
     f.close()
     return psi
@@ -402,38 +471,14 @@ def calculate_Dmeson_dNdpTdy(spectraFile, px_, py_, y_, initial_pT_):
     return (H, xbins, ybins)
 
 
-
-
-def calculate_beforeUrQMD(spectraFile, ievent, DmesonFile, resultFile, grpName, ycut, status='w'):
+def calculate_beforeUrQMD(spectraFile, DmesonFile, resultFile, grpName, ycut, status='a'):
     ID, px, py, pz, p0, ipT = read_oscar_file(DmesonFile)
     abs_ID = np.abs(ID)
     y = 0.5 * np.log((p0 + pz)/(p0 - pz))
     phi = np.arctan2(py, px)
-    fres = h5py.File(resultFile, status)
-
-    #---------------- light hadron --------------------
-    if 'light hadron' not in fres.keys():
-        group_light = fres.create_group('light hadron')
-        infoFile = 'initial/{}.info.dat'.format(ievent)
-        i = 2
-        with open(infoFile, 'r') as finfo:
-            for line in finfo:
-                inputline = line.split()
-                if len(inputline) == 3:
-                    if group_light.attrs.get(inputline[0], 0) == 0:
-                        group_light.attrs.create(inputline[0], float(inputline[2]))
-                    else:
-                        i += 1
-                        group_light.attrs.create(inputline[0]+str(i), float(inputline[2]))
-
-        initialFile = 'initial.dat'
-        dum_sd = np.loadtxt(initialFile)
-        dum_weight = (dum_sd*dum_sd).sum()
-        group_light.attrs.create('weight-TAA', dum_weight)
-        pp_angle = participant_plane_angle()
-        group_light.attrs.create('pp_angle', pp_angle)
 
     #------------ Dmeson midrapidity ------------------------
+    fres = h5py.File(resultFile, status)
     group_Dmeson = fres.create_group(grpName)
     group_Dmeson.create_dataset('pID', data=np.unique(ID))
 
@@ -477,13 +522,12 @@ def calculate_beforeUrQMD(spectraFile, ievent, DmesonFile, resultFile, grpName, 
  
     fres.close()
 
-
-def calculate_afterUrQMD(spectraFile, ievent, nsamples):
+def calculate_afterUrQMD(spectraFile, urqmd_outputFile, resultFile, grpName, ycut, status='a'):
     urqmd_outputFile = 'urqmd_final.dat'
-    resultFile = 'result_afterUrQMD.hdf5'
-    fres = h5py.File(resultFile, 'w')
+    fres = h5py.File(resultFile, status)
 
-    group_Dmeson = fres.create_group('Dmeson')
+    group_Dmeson = fres.create_group('afterUrQMD/Dmeson')
+
     ID, charge, px, py, pz, y, eta, ipT = read_text_file(urqmd_outputFile)
     pT = np.sqrt(px**2 + py**2)
     phi = np.arctan2(py, px)
@@ -536,29 +580,10 @@ def calculate_afterUrQMD(spectraFile, ievent, nsamples):
  
 
     ##------------------ light hadron ---------------------------------
-    group_light = fres.create_group('light hadron')
-    infoFile = 'initial/{}.info.dat'.format(ievent)
-    i = 2
-    with open(infoFile, 'r') as finfo:
-        for line in finfo:
-            inputline = line.split()
-            if len(inputline) == 3:
-                if group_light.attrs.get(inputline[0], 0) == 0:
-                    group_light.attrs.create(inputline[0], float(inputline[2]))
-                else:
-                    i += 1
-                    group_light.attrs.create(inputline[0] + str(i), float(inputline[2]))
-
-    initialFile = 'initial.dat'
-    dum_sd = np.loadtxt(initialFile)
-    dum_weight = (dum_sd*dum_sd).sum()
-    group_light.attrs.create('weight-TAA', dum_weight)
-    pp_angle = participant_plane_angle()
-    group_light.attrs.create('pp_angle', pp_angle)
-    group_light.attrs.create('nsamples', nsamples)
-
+    group_light = fres.create_group('afterUrQMD/light')
     ##---------------------------------------------------------------
     # dNch_deta
+    nsamples = fres['initial'].attrs.get('nsamples')
     H, bins = np.histogram(eta[charged], range=(-5, 5), bins=100)
     dNch_deta = H / nsamples / (bins[1] - bins[0])
     ds_dNchdeta = group_light.create_dataset('dNch_deta', data=dNch_deta)
@@ -632,67 +657,209 @@ def calculate_afterUrQMD(spectraFile, ievent, nsamples):
     fres.close()
 
 
+def parseConfig(configFile):
+    config = {}
+    with open(configFile, 'r') as f:
+        config = dict(
+            (i.strip() for i in l.split('=', maxsplit=1))
+            for l in f if not l.startswith('#')
+        )
+
+    print('read in config successfully :)')
+    return config
+
+
+
+
 def main():
     collision_sys = 'PbPb5020'
-    spectraFile = 'LHC5020-AA2ccbar.dat'
-    nevents = 10
+    spectraFile = 'spectra/LHC5020-AA2ccbar.dat'
+    #nevents = 10
 
-
-    # parse the config file
+    # ==== parse the config file ============================================
     if len(sys.argv) == 3:
-        with open(sys.argv[1], 'r') as f:
-            config = dict((i.strip() for i in l.split('=', maxsplit=1)) for l in f)
-            condor_ID = sys.argv[2]
+        config = parseConfig(sys.argv[1])
+        jobID = sys.argv[2]
     else:
         config = {}
-        condor_ID = 0
+        jobID = 0
 
-    ## for debug
-    print(config)
-   
+
+    # ====== set up grid size variables ======================================
     shutil.copy('parameters_df.dat', '../bin/')
     shutil.copy('parameters_hd.dat', '../bin/')
     shutil.copy('vishnew.conf', '../bin/')
-    shutil.copy('HQ_sample.conf', '../bin/')
-
     os.chdir('../bin')
-    run_initial(collision_sys, nevents)
+    grid_step = 0.1
+    grid_max = 15.05
+    dtau = 0.25 * grid_step
+    Nhalf = int(grid_max/grid_step)
+    
+    tau_fs = float(config.get('tau_fs'))
+    xi_fs = float(config.get('xi_fs'))
+    nevents = int(config.get('nevents'))
 
-    run_qhat(config.get('qhat_args', ''))
-    shutil.copy('gamma-table_charm.dat', '../results/gamma-table_charm.dat') 
+    # ========== initial condition ============================================
+    proj = collision_sys[:2]
+    targ = collision_sys[2:4]
 
-    for ievent in range(nevents):
-        postfix = '{}-{}.dat'.format(condor_ID, ievent)
-        initialFile = 'initial/{}.dat'.format(ievent)
-        initial_info_File = 'initial/{}.info.dat'.format(ievent)
-        shutil.copyfile(initialFile, 'initial.dat')
+    run_cmd(
+        './trento {} {}'.format(proj, targ), str(nevents),
+        '--grid-step {} --grid-max {}'.format(grid_step, grid_max),
+        '--output {}'.format('initial.hdf5'),
+        config.get('trento_args', '')
+    )
 
-        # run hydro
-        run_hydro()
-        run_HQsample()
+    run_qhat(config.get('qhat_args'))
 
-        run_diffusion(config.get('diffusion_args', ''))
-        run_fragPLUSrecomb()
 
-        participant_plane_angle()
-        resultFile = 'result_beforeUrQMD.hdf5'
-        calculate_beforeUrQMD('spectra/{}'.format(spectraFile), ievent, 'Dmeson_AAcY.dat', resultFile, 'Dmeson', 1.0, 'w')
-        calculate_beforeUrQMD('spectra/{}'.format(spectraFile), ievent, 'HQ_AAcY.dat', resultFile, 'HQ', 1.0, 'a')
+    # set up sampler HRG object 
+    Tswitch = float(config.get('Tswitch'))
+    hrg = frzout.HRG(Tswitch, species = 'urqmd', res_width=True)
+    eswitch = hrg.energy_density()
 
-        shutil.move('result_beforeUrQMD.hdf5', '../results/result_beforeUrQMD{}-{}.hdf5'.format(condor_ID, ievent))
 
-        nsamples = run_afterburner(ievent)
-        if nsamples != 0:
-            calculate_afterUrQMD('spectra/{}'.format(spectraFile), ievent, nsamples)
+    finitial = h5py.File('initial.hdf5', 'r')
 
-            # try to save the files
-            shutil.move('urqmd_final.dat', 'urqmd_final{}-{}.dat'.format(condor_ID, ievent))
-            shutil.move('Dmeson_AAcY.dat', 'Dmeson_AAcY{}-{}.dat'.format(condor_ID, ievent))
-            shutil.move('urqmd_input.dat', 'urqmd_input{}-{}.dat'.format(condor_ID, ievent))
-            shutil.move('result_afterUrQMD.hdf5', '../results/result_afterUrQMD{}-{}.hdf5'.format(condor_ID, ievent))
-        else:
-            print('no particle produced in this event!')
+    for (ievent, dset) in enumerate(finitial.values()):
+        resultFile = 'result_{}-{}.hdf5'.format(jobID, ievent)
+        fresult = h5py.File(resultFile, 'w')
+        print('# event: ', ievent)
+        ic = [dset['matter_density'].value, dset['Ncoll_density'].value]
+        event_gp = fresult.create_group('initial')
+        event_gp.attrs.create('initial_entropy', grid_step**2 * ic[0].sum())
+        event_gp.attrs.create('N_coll', grid_step**2 * ic[1].sum())
+        for (k, v) in list(finitial['event_{}'.format(ievent)].attrs.items()):
+            event_gp.attrs.create(k, v)
+
+        # =============== Freestreaming =========================================== 
+        save_fs_history(ic[0], event_size=grid_max, grid_step=grid_step,
+                        tau_fs=tau_fs, xi=xi_fs, steps=5, grid_max=grid_max, coarse=2)
+        fs = freestream.FreeStreamer(ic[0], grid_max, tau_fs)
+        e = fs.energy_density()
+        e_above = e[e> eswitch].sum()
+        event_gp.attrs.create('multi_factor', e.sum()/e_above if e_above > 0 else 1)
+        e.tofile('ed.dat')
+
+        # calculate the participant plane angle
+        participant_plane_angle(e, int(grid_max))
+
+        for i in [1, 2]:
+            fs.flow_velocity(i).tofile('u{}.dat'.format(i))
+        for ij in [(1,1), (1,2),(2,2)]:
+            fs.shear_tensor(*ij).tofile('pi{}{}.dat'.format(*ij))
+
+        # ============== vishnew hydro ===========================================
+        run_cmd(
+            './vishnew initialuread=1 iein=0',
+            't0={} dt={} dxy={} nls={}'.format(tau_fs, dtau, grid_step, Nhalf),
+            config.get('hydro_args', '')
+        )
+
+        # ============= frzout sampler =========================================
+        surface_data = np.fromfile('surface.dat', dtype='f8').reshape(-1, 16)
+        if surface_data.size == 0:
+            print("empty event")
             continue
+        print('surface_data.size: ', surface_data.size)
+
+        surface = frzout.Surface(**dict(
+            zip(['x', 'sigma', 'v'], np.hsplit(surface_data, [3, 6, 8])),
+            pi=dict(zip(['xx', 'xy', 'yy'], surface_data.T[11:14])),
+            Pi=surface_data.T[15]),
+            ymax=3.)
+
+        minsamples, maxsamples = 10, 100
+        minparts = 30000
+        nparts = 0   # for tracking total number of sampeld particles
+
+        # sample soft particles and write to file
+        with open('particle_in.dat', 'w') as f:
+            nsamples = 0
+            while nsamples < maxsamples + 1:
+                parts = frzout.sample(surface, hrg)
+                if parts.size == 0:
+                    continue
+                else:
+                    nsamples += 1
+                    nparts += parts.size
+                    print("#", parts.size, file=f)
+                    for p in parts:
+                        print(p['ID'], *itertools.chain(p['x'], p['p']), file=f)
+
+                    if nparts >= minparts and nsamples >= minsamples:
+                        break
+
+        event_gp.attrs.create('nsamples', nsamples, dtype=np.int)
+
+        # =============== HQ initial position sampling ===========================
+        initial_TAA = ic[1]
+        np.savetxt('initial_Ncoll_density.dat', initial_TAA)
+        HQ_sample_conf = {'IC_file': 'initial_Ncoll_density.dat',\
+                          'XY_file': 'initial_HQ.dat', \
+                          'IC_Nx_max': initial_TAA.shape[0], \
+                          'IC_Ny_max': initial_TAA.shape[1], \
+                          'IC_dx': grid_step, \
+                          'IC_dy': grid_step, \
+                          'IC_tau0': 0, \
+                          'N_sample': 60000, \
+                          'N_scale': 0.05, \
+                          'scale_flag': 0}
+
+        ftmp = open('HQ_sample.conf', 'w')
+        for (key, value) in zip(HQ_sample_conf.keys(), HQ_sample_conf.values()):
+            inputline = ' = '.join([str(key), str(value)]) + '\n'
+            ftmp.write(inputline)
+        ftmp.close()
+
+        run_cmd('./HQ_sample HQ_sample.conf')
+
+        # ================ HQ evolution (pre-equilibirum stages) =================
+        os.environ['ftn00'] = 'FreeStream.h5'
+        os.environ['ftn10'] = 'dNg_over_dt_cD6.dat'
+        os.environ['ftn20'] = 'HQ_AAcY_preQ.dat'
+        os.environ['ftn30'] = 'initial_HQ.dat'
+        run_cmd('./diffusion hq_input=3.0 ',
+                config.get('diffusion_args', '')
+        )
+
+        # ================ HQ evolution (in medium evolution) ====================
+        os.environ['ftn00'] = 'JetData.h5'
+        os.environ['ftn10'] = 'dNg_over_dt_cD6.dat'
+        os.environ['ftn20'] = 'HQ_AAcY.dat'
+        os.environ['ftn30'] = 'HQ_AAcY_preQ.dat'
+        run_cmd('./diffusion hq_input=4.0 ',
+                config.get('diffusion_args', '')
+        )
+
+    
+        # ============== Heavy quark hardonization ==============================
+        os.environ['ftn20'] = 'Dmeson_AAcY.dat'
+        child1 = 'cat HQ_AAcY.dat'
+        p1 = subprocess.Popen(child1.split(), stdout=subprocess.PIPE)
+        p2 = subprocess.Popen('./fragPLUSrecomb', stdin = p1.stdout)
+        p1.stdout.close()
+        output = p2.communicate()[0]
+
+        # ============ Heavy + soft UrQMD =================================
+        run_cmd('./afterburner {} urqmd_final.dat particle_in.dat Dmeson_AAcY.dat'.format(nsamples))
+
+        # =========== processing data ====================================
+        calculate_beforeUrQMD(spectraFile, 'Dmeson_AAcY.dat', resultFile, 'beforeUrQMD/Dmeson', 1.0, 'a')
+        calculate_beforeUrQMD(spectraFile, 'HQ_AAcY.dat', resultFile, 'beforeUrQMD/HQ', 1.0, 'a')
+        calculate_beforeUrQMD(spectraFile, 'HQ_AAcY_preQ.dat', resultFile, 'beforeUrQMD/HQ_preQ', 1.0, 'a')
+        if nsamples != 0:
+            calculate_afterUrQMD(spectraFile, 'urqmd_final.dat', resultFile, 'afterUrQMD/Dmeson', 1.0, 'a')
+        
+        shutil.move('urqmd_final.dat', '../results/urqmd_final{}-{}.dat'.format(jobID, ievent))
+        shutil.move('Dmeson_AAcY.dat', '../results/Dmeson_AAcY{}-{}.dat'.format(jobID, ievent))
+        shutil.move('HQ_AAcY.dat', '../results/HQ_AAcY{}-{}.dat'.format(jobID, ievent))
+        shutil.move('HQ_AAcY_preQ.dat', '../results/HQ_AAcY_preQ{}-{}.dat'.format(jobID, ievent))
+        shutil.move(resultFile, '../results/{}'.format(resultFile))
+    
+    #=== after everything, save initial profile (depends on how large the size if, I may choose to forward this step)
+    shutil.move('initial.hdf5', '../results/initial_{}.hdf5'.format(jobID))
+    shutil.move('gamma-table_charm.dat', '../results/gamma-table_charm.dat')
 
 if __name__ == '__main__':
     main()

@@ -67,6 +67,7 @@ corr_flag.    0       ! 1 for calculation of HF pair correlation
 # Other options for the code
 static....    2       ! Choose the type of medium
                       ! 0 - Chiho's hydro, 1 - Static, 2 - OSU hydro
+initt.....    0.6     ! initial hydro starting time
 stat_cool.    0       ! If static=1, stat_cool=1 provides cooling of Bjorken's expansion
 T_static..    0.30    ! If static=1, set medium temperature in GeV here
 tsteps_cut    200     ! Control total timesteps for Langevin evolution 
