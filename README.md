@@ -95,7 +95,7 @@ cd workdir/
 # run-events_cD.py is the pipeline script
 # args.conf changes the parameters ($alpha_s, \hat{q}_{min}, \hat{q}_{slope}, \gamma$
 # 0 is the jobID (useful to run parallel events)
-sudo docker run -v `pwd`:/var/hic_HQ-osg/results hic_hq:v1 python3 run-events_cD.py args.conf 0
+sudo docker run -v `pwd`:/usr/local/hic_HQ-osg/results hic_hq:v1 python3 run-events_cD.py args.conf 0
 ```
 
 ### 1.2b Instead of 1.2a, pull a `Docker` image from *dockerhub*
