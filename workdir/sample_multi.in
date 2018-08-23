@@ -1,0 +1,27 @@
+# sample input file for BMS_AP
+# first some global flags
+#  refsys  tstep  logscale  addition
+ff  0       1       0        0
+# Determine whether weight is required in analysis
+#  flag_wt  wt_num  wt_int  wt_Tab_min
+wt  2       280     0.5      0.5
+# now define 3 groups for analysis
+# group 1: flag    particles
+gr         0       8
+# itypes: 4=charm quark  411=D+  421=D0
+# tp        4     -4
+tp    411 421 413 423 -411 -421 -413 -423 
+# cuts: observable  min     max    group
+# perform 1 cuts on all groups
+# cu      58          0.29    0.31     0       # 
+cu      6        -0.5        0.5        0       #
+# cu      59        0         1        0       #
+# now do some analysis
+# first some 1D histos
+# x  observ.     minbin    maxbin    nbins
+xa  5    0.5   69.5    139
+# xa  5    0.25   4.75    13
+za  1    1     13
+# now the end of file
+xx end
+# this is a dummy line

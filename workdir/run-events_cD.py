@@ -18,10 +18,11 @@ import h5py
 import shutil
 from scipy.interpolate import interp1d
 
-sys.path.insert(1, 'lib/python3.5/site-packages')
+#sys.path.insert(1, 'lib/python3.5/site-packages')
 import freestream
 import frzout
 
+share=os.environ.get('XDG_DATA_HOME')
 
 def run_cmd(*args, **kwargs):
     print(*args, flush=True)
@@ -139,7 +140,7 @@ def run_initial(collision_sys, nevents, grid_step, grid_max, config):
     proj = collision_sys[:2]
     targ = collision_sys[2:4]
     run_cmd(
-        './trento {} {}'.format(proj, targ), str(nevents),
+        'trento {} {}'.format(proj, targ), str(nevents),
         '--grid-step {} --grid-max {}'.format(grid_step, grid_max),
         '--output initial.hdf5',
         config.get('trento_args', '')
@@ -147,18 +148,18 @@ def run_initial(collision_sys, nevents, grid_step, grid_max, config):
 
 def run_hydro(tau_fs, dtau, grid_step, Nhalf, config):
     run_cmd(
-        './vishnew initialuread=1 iein=0',
+        'vishnew initialuread=1 iein=0',
         't0={} dt={} dxy={} nls={}'.format(tau_fs, dtau, grid_step, Nhalf),
 
     )
 
 
 def run_HQsample():
-    run_cmd('./HQ_sample HQ_sample.conf')
+    run_cmd('HQ_sample HQ_sample.conf')
 
 
 def run_qhat(args):
-    run_cmd('./qhat_pQCD', str(args))
+    run_cmd('qhat_pQCD', str(args))
     args_list = args.split()
     if args_list[0] == '--mass':
         mass = float(args_list[1])
@@ -202,16 +203,16 @@ def run_qhat(args):
 
 
 def run_diffusion(args):
-    os.environ['ftn10'] = 'dNg_over_dt_cD6.dat'
+    os.environ['ftn10'] = '%s/dNg_over_dt_cD6.dat'%share
     os.environ['ftn20'] = 'HQ_AAcY.dat'
     os.environ['ftn30'] = 'initial_HQ.dat'
-    run_cmd('./diffusion', str(args))
+    run_cmd('diffusion', str(args))
 
 def run_fragPLUSrecomb():
     os.environ['ftn20'] = 'Dmeson_AAcY.dat'
     child1 = 'cat HQ_AAcY.dat'
     p1 = subprocess.Popen(child1.split(), stdout=subprocess.PIPE)
-    p2 = subprocess.Popen('./fragPLUSrecomb', stdin=p1.stdout)
+    p2 = subprocess.Popen('fragPLUSrecomb', stdin=p1.stdout)
     p1.stdout.close()
     output = p2.communicate()[0]
 
@@ -265,7 +266,7 @@ def run_afterburner(ievent):
     finfo.close()
 
     nsamples = min(max(int(2*1e5/initial_mult), 2), 100)
-    run_cmd('./sampler oversamples={}'.format(nsamples))
+    run_cmd('sampler oversamples={}'.format(nsamples))
 
     # a non-empty hypersurface can still emit zero particles. If no particles is produced, the output 
     # will contain the three-line oscar header and nothing else. In this case, throw this event
@@ -673,8 +674,7 @@ def parseConfig(configFile):
 
 def main():
     collision_sys = 'PbPb5020'
-    spectraFile = 'spectra/LHC5020-AA2ccbar.dat'
-    #nevents = 10
+    spectraFile = '%s/spectra/LHC5020-AA2ccbar.dat'%share
 
     # ==== parse the config file ============================================
     if len(sys.argv) == 3:
@@ -686,10 +686,6 @@ def main():
 
 
     # ====== set up grid size variables ======================================
-    shutil.copy('parameters_df.dat', '../bin/')
-    shutil.copy('parameters_hd.dat', '../bin/')
-    shutil.copy('vishnew.conf', '../bin/')
-    os.chdir('../bin')
     grid_step = 0.1
     grid_max = 15.05
     dtau = 0.25 * grid_step
@@ -702,17 +698,15 @@ def main():
     # ========== initial condition ============================================
     proj = collision_sys[:2]
     targ = collision_sys[2:4]
-
+        
     run_cmd(
-        './trento {} {}'.format(proj, targ), str(nevents),
+        'trento {} {}'.format(proj, targ), str(nevents),
         '--grid-step {} --grid-max {}'.format(grid_step, grid_max),
         '--output {}'.format('initial.hdf5'),
         config.get('trento_args', '')
     )
 
     run_qhat(config.get('qhat_args'))
-
-
     # set up sampler HRG object 
     Tswitch = float(config.get('Tswitch'))
     hrg = frzout.HRG(Tswitch, species = 'urqmd', res_width=True)
@@ -751,7 +745,7 @@ def main():
 
         # ============== vishnew hydro ===========================================
         run_cmd(
-            './vishnew initialuread=1 iein=0',
+            'vishnew initialuread=1 iein=0',
             't0={} dt={} dxy={} nls={}'.format(tau_fs, dtau, grid_step, Nhalf),
             config.get('hydro_args', '')
         )
@@ -812,23 +806,24 @@ def main():
             ftmp.write(inputline)
         ftmp.close()
 
-        run_cmd('./HQ_sample HQ_sample.conf')
+        run_cmd('HQ_sample HQ_sample.conf')
 
         # ================ HQ evolution (pre-equilibirum stages) =================
         os.environ['ftn00'] = 'FreeStream.h5'
-        os.environ['ftn10'] = 'dNg_over_dt_cD6.dat'
+        os.environ['ftn10'] = '%s/dNg_over_dt_cD6.dat'%share
+        print(os.environ['ftn10'])
         os.environ['ftn20'] = 'HQ_AAcY_preQ.dat'
         os.environ['ftn30'] = 'initial_HQ.dat'
-        run_cmd('./diffusion hq_input=3.0 ',
+        run_cmd('diffusion hq_input=3.0 initt={}'.format(tau_fs*xi_fs),
                 config.get('diffusion_args', '')
         )
 
         # ================ HQ evolution (in medium evolution) ====================
         os.environ['ftn00'] = 'JetData.h5'
-        os.environ['ftn10'] = 'dNg_over_dt_cD6.dat'
+        os.environ['ftn10'] = '%s/dNg_over_dt_cD6.dat'%share
         os.environ['ftn20'] = 'HQ_AAcY.dat'
         os.environ['ftn30'] = 'HQ_AAcY_preQ.dat'
-        run_cmd('./diffusion hq_input=4.0 ',
+        run_cmd('diffusion hq_input=4.0 initt={}'.format(tau_fs),
                 config.get('diffusion_args', '')
         )
 
@@ -837,12 +832,12 @@ def main():
         os.environ['ftn20'] = 'Dmeson_AAcY.dat'
         child1 = 'cat HQ_AAcY.dat'
         p1 = subprocess.Popen(child1.split(), stdout=subprocess.PIPE)
-        p2 = subprocess.Popen('./fragPLUSrecomb', stdin = p1.stdout)
+        p2 = subprocess.Popen('fragPLUSrecomb', stdin = p1.stdout)
         p1.stdout.close()
         output = p2.communicate()[0]
 
         # ============ Heavy + soft UrQMD =================================
-        run_cmd('./afterburner {} urqmd_final.dat particle_in.dat Dmeson_AAcY.dat'.format(nsamples))
+        run_cmd('afterburner {} urqmd_final.dat particle_in.dat Dmeson_AAcY.dat'.format(nsamples))
 
         # =========== processing data ====================================
         calculate_beforeUrQMD(spectraFile, 'Dmeson_AAcY.dat', resultFile, 'beforeUrQMD/Dmeson', 1.0, 'a')
@@ -851,15 +846,13 @@ def main():
         if nsamples != 0:
             calculate_afterUrQMD(spectraFile, 'urqmd_final.dat', resultFile, 'afterUrQMD/Dmeson', 1.0, 'a')
         
-        shutil.move('urqmd_final.dat', '../results/urqmd_final{}-{}.dat'.format(jobID, ievent))
-        shutil.move('Dmeson_AAcY.dat', '../results/Dmeson_AAcY{}-{}.dat'.format(jobID, ievent))
-        shutil.move('HQ_AAcY.dat', '../results/HQ_AAcY{}-{}.dat'.format(jobID, ievent))
-        shutil.move('HQ_AAcY_preQ.dat', '../results/HQ_AAcY_preQ{}-{}.dat'.format(jobID, ievent))
-        shutil.move(resultFile, '../results/{}'.format(resultFile))
+        shutil.move('urqmd_final.dat', 'urqmd_final{}-{}.dat'.format(jobID, ievent))
+        shutil.move('Dmeson_AAcY.dat', 'Dmeson_AAcY{}-{}.dat'.format(jobID, ievent))
+        shutil.move('HQ_AAcY.dat', 'HQ_AAcY{}-{}.dat'.format(jobID, ievent))
+        shutil.move('HQ_AAcY_preQ.dat', 'HQ_AAcY_preQ{}-{}.dat'.format(jobID, ievent))
     
     #=== after everything, save initial profile (depends on how large the size if, I may choose to forward this step)
-    shutil.move('initial.hdf5', '../results/initial_{}.hdf5'.format(jobID))
-    shutil.move('gamma-table_charm.dat', '../results/gamma-table_charm.dat')
+    shutil.move('initial.hdf5', 'initial_{}.hdf5'.format(jobID))
 
 if __name__ == '__main__':
     main()
