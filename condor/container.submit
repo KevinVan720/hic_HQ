@@ -1,0 +1,29 @@
+universe=vanilla
+
+# specific the XSDED project to charge the job usage to - this is a 
+# required attribution for all jobs submitted on the OSG-XSEDE resource
++ProjectName="Duke-QGP"
+
+# requirements is an expression to specify machines that can run jobs
+requirements = (OSGVO_OS_STRING == "RHEL 6" || OSGVO_OS_STRING == "RHEL 7") && (CVMFS_oasis_opensciencegrid_org_REVISION >= 3467) && (HAS_MODULES == True)
+request_memory = 2G
+request_disk = 4G
+
+executable = ./run_wrapper
+
+arguments = $(Process)
+
+should_transfer_files = YES
+WhenToTransferOutput = ON_EXIT
+
+# files needed by the job
+transfer_input_files = Results.tar.gz, args.conf
+transfer_output_files = results$(Process).tar.gz
+
+output = log/ebe.out.$(Cluster)-$(Process)
+error = log/ebe.err.$(Cluster)-$(Process)
+log = log/ebe.log.$(Cluster)-$(Process)
+
+notification = NEVER
+
+queue 500

@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# Question? Do we need to install docker in each remote node?
+# if docker is needed to be installed, uncomment the following steps
+# mkdir Install && cd Install
+# sudo apt-get install libsystemd-journal0
+# wget https://download.docker.com/linux/ubuntu/dists/trusty/pool/stable/amd64/docker-ce_17.03.2~ce-0~ubuntu-trusty_amd64.deb
+# sudo dpkg -i docker-ce_17.03.2~ce-0~ubuntu-trusty_amd64.deb
+
+
+tar -xzf Results.tar.gz
+cd Results/
+cp ../args.conf .
+sudo docker pull yingruxu/hic_hq:freestreaming
+sudo docker run -v `pwd`:/usr/local/hic_HQ-osg/results yingruxu/hic_hq:freestreaming python3 run-events_cD.py args.conf $1
+
+cd ../
+tar -czf results$1.tar.gz Results
