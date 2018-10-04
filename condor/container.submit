@@ -5,7 +5,7 @@ universe=vanilla
 +ProjectName="Duke-QGP"
 
 # requirements is an expression to specify machines that can run jobs
-requirements = (OSGVO_OS_STRING == "RHEL 6" || OSGVO_OS_STRING == "RHEL 7") && (CVMFS_oasis_opensciencegrid_org_REVISION >= 3467) && (HAS_MODULES == True)
+# requirements = (OSGVO_OS_STRING == "RHEL 6" || OSGVO_OS_STRING == "RHEL 7") && (CVMFS_oasis_opensciencegrid_org_REVISION >= 3467) && (HAS_MODULES == True)
 request_memory = 2G
 request_disk = 4G
 
@@ -26,4 +26,4 @@ log = log/ebe.log.$(Cluster)-$(Process)
 
 notification = NEVER
 
-queue 500
+queue 10

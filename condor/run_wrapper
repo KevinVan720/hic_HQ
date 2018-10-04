@@ -11,8 +11,12 @@
 tar -xzf Results.tar.gz
 cd Results/
 cp ../args.conf .
-sudo docker pull yingruxu/hic_hq:freestreaming
-sudo docker run -v `pwd`:/usr/local/hic_HQ-osg/results yingruxu/hic_hq:freestreaming python3 run-events_cD.py args.conf $1
+export SINGULARITY_PULLFOLDER=${PWD}
+singularity pull docker://yingruxu/hic_hq:freestreaming
+singularity exec -B $PWD:/usr/local/hic_HQ-osg/results hic_hq-freestreaming.simg python3 run-events_cD.py args.conf $1
+
+# sudo -S docker pull yingruxu/hic_hq:freestreaming
+# sudo -S docker run -v `pwd`:/usr/local/hic_HQ-osg/results yingruxu/hic_hq:freestreaming python3 run-events_cD.py args.conf $1
 
 cd ../
 tar -czf results$1.tar.gz Results
