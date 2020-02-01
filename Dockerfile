@@ -14,7 +14,7 @@ RUN pip3 install fortranformat
 
 # Install hic_HQ-osg
 RUN echo pwd
-RUN git clone --recursive https://github.com/Yingru/hic_HQ-osg.git
+RUN git clone --recursive https://github.com/KevinVan720/hic_event
 
 WORKDIR hic_HQ-osg/
 RUN git checkout container
